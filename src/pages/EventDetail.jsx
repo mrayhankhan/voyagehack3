@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import gsap from 'gsap';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -29,7 +29,7 @@ import { exportToCSV, exportToPDF } from '../lib/export';
 
 // ── Shared Micro-Components ─────────────────────────────────────────────────
 
-const Badge = ({ label, type = 'neutral' }) => {
+const Badge = ({ label }) => {
     const map = {
         CONFIRMED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         SAFE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -119,10 +119,13 @@ const TABS = [
 
 // ── Tab Panels ────────────────────────────────────────────────────────────────
 
-const OverviewTab = ({ event, handleEmailBlast, handleExportReport }) => {
+const OverviewTab = ({ event, handleEmailBlast, handleExportReport, globalInventory }) => {
     const d = getOverviewData(event);
     const cs = getContractStatusStyle(event.contractStatus);
     const { canSeeFinance, canSeeMargin } = useAuth();
+
+    // Dynamically calculate Rooms Blocked from live inventory array
+    const roomsBlocked = globalInventory.find(cat => cat.key === 'accommodation')?.total || 0;
 
     return (
         <div>
@@ -130,7 +133,7 @@ const OverviewTab = ({ event, handleEmailBlast, handleExportReport }) => {
                 {canSeeFinance ? (
                     <Kpi label="Total Budget" value={`$${(event.budget / 1000).toFixed(0)}K`} sub="Contract value" color="text-tbo-indigo" />
                 ) : (
-                    <Kpi label="Rooms Blocked" value="45" sub="Standard units" color="text-tbo-indigo" />
+                    <Kpi label="Rooms Blocked" value={roomsBlocked} sub="Standard units" color="text-tbo-indigo" />
                 )}
 
                 <Kpi label="Contracted Pax" value={event.headcount} sub="Max headcount" />
@@ -185,7 +188,7 @@ const OverviewTab = ({ event, handleEmailBlast, handleExportReport }) => {
 };
 
 const ContractTab = ({ event }) => {
-    const pdc = getDigitalContractData(event);
+    const pdc = useMemo(() => getDigitalContractData(event), [event]);
     const [health, setHealth] = useState(computeContractHealth(event, pdc));
     const { commercialTerms: ct, inclusions, automationRules } = pdc;
     const { canEditContract } = useAuth();
@@ -195,7 +198,7 @@ const ContractTab = ({ event }) => {
         const tick = () => setHealth(computeContractHealth(event, pdc));
         const id = setInterval(tick, 60000); // update every minute
         return () => clearInterval(id);
-    }, [event.id]);
+    }, [event, pdc]);
 
     const cs = getContractStatusStyle(event.contractStatus);
     const PRIORITY_STYLE = {
@@ -472,8 +475,9 @@ const CatIcon = ({ name, size, className }) => {
 };
 
 
-const InventoryTab = ({ event }) => {
-    const [inventory, setInventory] = useState(() => getEventInventory(event));
+const InventoryTab = ({ event, globalInventory, setGlobalInventory }) => {
+    const inventory = globalInventory;
+    const setInventory = setGlobalInventory;
     const [expanded, setExpanded] = useState(null);
     const [lockModal, setLockModal] = useState(null); // { catKey, itemIdx, itemName }
     const [locking, setLocking] = useState(false);
@@ -691,57 +695,9 @@ const InventoryTab = ({ event }) => {
     );
 };
 
-const GuestsTab = ({ event }) => {
-    const [guests, setGuests] = useState([]);
+const GuestsTab = ({ event, globalGuests, fnbBreakdown, lastUpdate, handleDietaryChange }) => {
+    const guests = globalGuests;
     const [filters, setFilters] = useState({ rsvp: 'ALL', dietary: 'ALL', payment: 'ALL', room: 'ALL', search: '' });
-    const [lastUpdate, setLastUpdate] = useState(null);
-    const [fnbBreakdown, setFnbBreakdown] = useState({});
-
-    // Fetch initial list and setup socket listener
-    useEffect(() => {
-        const fetchGuests = async () => {
-            try {
-                const res = await guestApi.getByEvent(event.id);
-                setGuests(res);
-                setFnbBreakdown(computeFnBBreakdown(res));
-                setLastUpdate(new Date().toLocaleTimeString());
-            } catch (err) {
-                console.error('Failed to load guests', err);
-            }
-        };
-
-        fetchGuests();
-
-        const handleGuestUpdate = (updatedGuest) => {
-            setGuests(prev => {
-                // If exists, replace, else append
-                const exists = prev.some(g => g.email === updatedGuest.email);
-                let newList;
-                if (exists) {
-                    newList = prev.map(g => g.email === updatedGuest.email ? updatedGuest : g);
-                } else {
-                    newList = [updatedGuest, ...prev];
-                }
-                setFnbBreakdown(computeFnBBreakdown(newList));
-                setLastUpdate(new Date().toLocaleTimeString());
-                return newList;
-            });
-        };
-
-        socket.on('guest:update', handleGuestUpdate);
-        return () => {
-            socket.off('guest:update', handleGuestUpdate);
-        };
-    }, [event.id]);
-
-    // When a dietary tag is changed inline, recompute F&B breakdown
-    const handleDietaryChange = (guestId, newTag) => {
-        setGuests(prev => {
-            const updated = prev.map(g => g.id === guestId ? { ...g, dietary: newTag, _flash: true } : g);
-            setFnbBreakdown(computeFnBBreakdown(updated));
-            return updated;
-        });
-    };
 
     const visible = filterGuests(guests, filters);
     const confirmed = guests.filter(g => g.rsvp === 'CONFIRMED').length;
@@ -956,9 +912,10 @@ const GuestsTab = ({ event }) => {
 };
 
 
-const AllocationTab = ({ event }) => {
+const AllocationTab = ({ event, globalUnits, setGlobalUnits, handleInventoryUsageChange }) => {
     // ── State ──────────────────────────────────────────────────────────────────
-    const [units, setUnits] = useState(() => getRoomUnitGrid(event));
+    const units = globalUnits;
+    const setUnits = setGlobalUnits;
     const [guests, setGuests] = useState(() =>
         getGuestFeed(event)
             .filter(g => g.rsvp === 'CONFIRMED')
@@ -988,6 +945,9 @@ const AllocationTab = ({ event }) => {
         setCH(prev => recomputeContractHealthAfterAssign(prev, 1));
         setLastAction({ guestName: selectedGuest.name, roomNo: unit.roomNo, type: unit.type, action: 'ASSIGNED' });
         setGuest(null);
+        
+        // Sync Inventory
+        handleInventoryUsageChange(unit.type, 1);
     };
 
     // ── Release handler ───────────────────────────────────────────────────────
@@ -999,6 +959,9 @@ const AllocationTab = ({ event }) => {
         ));
         setCH(prev => recomputeContractHealthAfterAssign(prev, -1));
         setLastAction({ guestName: unit.assignedTo, roomNo: unit.roomNo, type: unit.type, action: 'RELEASED' });
+        
+        // Sync Inventory
+        handleInventoryUsageChange(unit.type, -1);
     };
 
     const healthColor = contractHealth.status === 'SAFE' ? { dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' }
@@ -1216,8 +1179,8 @@ const AllocationTab = ({ event }) => {
 };
 
 
-const TransportTab = ({ event }) => {
-    const d = getTransportData(event);
+const TransportTab = ({ globalInventory }) => {
+    const d = getTransportData(globalInventory);
     return (
         <div>
             <Panel title="Flight Manifest" action={<Btn icon={Plus} label="Add Flight" variant="primary" />}>
@@ -1288,7 +1251,7 @@ const VendorsTab = () => {
     );
 };
 
-const PaymentsTab = ({ event }) => {
+const PaymentsTab = ({ event, handleExportInvoice }) => {
     const d = getPaymentData(event);
     return (
         <div>
@@ -1297,7 +1260,7 @@ const PaymentsTab = ({ event }) => {
                 <Kpi label="Amount Paid" value={`$${(d.totalPaid / 1000).toFixed(0)}K`} sub="50% collected" color="text-emerald-700" />
                 <Kpi label="Outstanding Balance" value={`$${(d.outstanding / 1000).toFixed(0)}K`} sub="Due before event" color="text-red-600" />
             </div>
-            <Panel title="Payment Schedule" action={<Btn icon={Download} label="Download Invoice" />}>
+            <Panel title="Payment Schedule" action={<Btn icon={Download} label="Download Invoice" onClick={handleExportInvoice} />}>
                 <table className="w-full">
                     <thead><tr><Th>Description</Th><Th>Amount</Th><Th>Due Date</Th><Th>Paid Date</Th><Th>Status</Th><Th>Action</Th></tr></thead>
                     <tbody>
@@ -1321,25 +1284,66 @@ const PaymentsTab = ({ event }) => {
 };
 
 const ExecutionTab = ({ event }) => {
-    const d = getExecutionData(event);
-    const now = new Date();
+    // 1. Wrap the initial static data in state so we can mutate it
+    const [executionData, setExecutionData] = useState(() => getExecutionData(event));
+    
+    // 2. Handlers to update specific tasks
+    const handleMarkDone = (dayIndex, taskIndex) => {
+        setExecutionData(prev => {
+            const next = { ...prev };
+            const nextDays = [...next.days];
+            const nextTasks = [...nextDays[dayIndex].tasks];
+            
+            nextTasks[taskIndex] = { ...nextTasks[taskIndex], status: 'DONE' };
+            nextDays[dayIndex] = { ...nextDays[dayIndex], tasks: nextTasks };
+            return { ...next, days: nextDays };
+        });
+    };
+
+    const handleMarkDelay = (dayIndex, taskIndex) => {
+        setExecutionData(prev => {
+            const next = { ...prev };
+            const nextDays = [...next.days];
+            const nextTasks = [...nextDays[dayIndex].tasks];
+            
+            nextTasks[taskIndex] = { ...nextTasks[taskIndex], status: 'DELAYED' };
+            nextDays[dayIndex] = { ...nextDays[dayIndex], tasks: nextTasks };
+            return { ...next, days: nextDays };
+        });
+    };
+
+    const handleMarkAllDone = (dayIndex) => {
+        setExecutionData(prev => {
+            const next = { ...prev };
+            const nextDays = [...next.days];
+            const nextTasks = nextDays[dayIndex].tasks.map(t => ({ ...t, status: 'DONE' }));
+            
+            nextDays[dayIndex] = { ...nextDays[dayIndex], tasks: nextTasks };
+            return { ...next, days: nextDays };
+        });
+    };
+
     return (
         <div className="space-y-6">
-            {d.days.map((day, di) => (
-                <Panel key={di} title={`${day.day} — ${day.label}`} action={<Btn icon={CheckSquare} label="Mark All Done" />}>
+            {executionData.days.map((day, di) => (
+                <Panel key={di} title={`${day.day} — ${day.label}`} action={<Btn icon={CheckSquare} label="Mark All Done" onClick={() => handleMarkAllDone(di)} />}>
                     <table className="w-full">
                         <thead><tr><Th>Time</Th><Th>Task</Th><Th>Owner</Th><Th>Status</Th><Th>Action</Th></tr></thead>
                         <tbody>
                             {day.tasks.map((t, i) => (
-                                <tr key={i} className="hover:bg-gray-50">
+                                <tr key={i} className={`hover:bg-gray-50 transition-colors ${t.status === 'DONE' ? 'opacity-50' : ''}`}>
                                     <Td><span className="font-mono text-xs text-tbo-saffron font-bold whitespace-nowrap">{t.time}</span></Td>
-                                    <Td><span className="font-medium text-gray-900">{t.task}</span></Td>
+                                    <Td><span className={`font-medium ${t.status === 'DONE' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{t.task}</span></Td>
                                     <Td className="text-gray-500 text-xs">{t.owner}</Td>
                                     <Td><Badge label={t.status} /></Td>
                                     <Td>
                                         <div className="flex gap-1.5">
-                                            <Btn icon={CheckSquare} label="Done" />
-                                            <Btn icon={Clock} label="Delay" />
+                                            {t.status !== 'DONE' && (
+                                                <>
+                                                    <Btn icon={CheckSquare} label="Done" onClick={() => handleMarkDone(di, i)} />
+                                                    <Btn icon={Clock} label="Delay" onClick={() => handleMarkDelay(di, i)} />
+                                                </>
+                                            )}
                                         </div>
                                     </Td>
                                 </tr>
@@ -1363,6 +1367,106 @@ const EventDetail = () => {
 
     const event = getMockEventById(id);
     const cs = getContractStatusStyle(event.contractStatus);
+
+    // ── Lifted State for Inventory & Allocation Sync ──────────────────────────
+    const [globalInventory, setGlobalInventory] = useState(() => getEventInventory(event));
+    const [globalUnits, setGlobalUnits] = useState(() => {
+        const initInv = getEventInventory(event);
+        return getRoomUnitGrid(event, initInv);
+    });
+
+    const [globalGuests, setGlobalGuests] = useState([]);
+    const [fnbBreakdown, setFnbBreakdown] = useState({});
+    const [lastUpdate, setLastUpdate] = useState(null);
+
+    // Fetch initial list and setup socket listener for Guests
+    useEffect(() => {
+        const fetchState = async () => {
+            try {
+                let res = await guestApi.getByEvent(id || event.id);
+                if (!res || res.length === 0) {
+                    res = getGuestFeed(event);
+                }
+                setGlobalGuests(res);
+                setFnbBreakdown(computeFnBBreakdown(res));
+                setLastUpdate(new Date().toLocaleTimeString());
+            } catch (err) {
+                console.error('Failed to load guests', err);
+                const res = getGuestFeed(event);
+                setGlobalGuests(res);
+                setFnbBreakdown(computeFnBBreakdown(res));
+                setLastUpdate(new Date().toLocaleTimeString());
+            }
+        };
+
+        if (event) fetchState();
+
+        const handleGuestUpdate = (updatedGuest) => {
+            setGlobalGuests(prev => {
+                const exists = prev.some(g => g.email === updatedGuest.email);
+                let newList;
+                if (exists) {
+                    newList = prev.map(g => g.email === updatedGuest.email ? updatedGuest : g);
+                } else {
+                    newList = [updatedGuest, ...prev];
+                }
+                setFnbBreakdown(computeFnBBreakdown(newList));
+                setLastUpdate(new Date().toLocaleTimeString());
+                return newList;
+            });
+        };
+
+        socket.on('guest:update', handleGuestUpdate);
+        return () => {
+            socket.off('guest:update', handleGuestUpdate);
+        };
+    }, [id, event]);
+
+    const handleDietaryChange = (guestId, newTag) => {
+        setGlobalGuests(prev => {
+            const updated = prev.map(g => g.id === guestId ? { ...g, dietary: newTag, _flash: true } : g);
+            setFnbBreakdown(computeFnBBreakdown(updated));
+            return updated;
+        });
+    };
+
+    // Derived live event state for sync consistent UI
+    const liveEvent = useMemo(() => ({
+        ...event,
+        confirmedGuests: globalGuests.filter(g => g.rsvp === 'CONFIRMED').length
+    }), [event, globalGuests]);
+
+    // Sync handler: when an allocation changes, update the inventory used count
+    const handleInventoryUsageChange = (roomType, delta) => {
+        setGlobalInventory(prev => {
+            const accIndex = prev.findIndex(cat => cat.key === 'accommodation');
+            if (accIndex === -1) return prev;
+            
+            const next = [...prev];
+            const accCat = { ...next[accIndex], items: [...next[accIndex].items] };
+            
+            // Map Room Type strings to Inventory Item Names
+            const typeMap = {
+                'Deluxe Room': 'Deluxe Rooms',
+                'Superior Suite': 'Superior Suites',
+                'Presidential Suite': 'Presidential Suite',
+                'Garden Cottage': 'Garden Cottages'
+            };
+            const targetItemName = typeMap[roomType];
+            
+            const itemIdx = accCat.items.findIndex(it => it.name === targetItemName);
+            if (itemIdx >= 0) {
+                const updatedItem = { ...accCat.items[itemIdx] };
+                updatedItem.used = Math.max(0, updatedItem.used + delta);
+                accCat.items[itemIdx] = updatedItem;
+                
+                // Recalculate category total used
+                accCat.used = accCat.items.reduce((s, it) => s + it.used, 0);
+                next[accIndex] = accCat;
+            }
+            return next;
+        });
+    };
 
     useEffect(() => {
         if (!user) { navigate('/agent/login'); return; }
@@ -1402,7 +1506,101 @@ const EventDetail = () => {
         }
     };
 
-    const tabProps = { event, handleEmailBlast, handleExportReport };
+    const handleExportCSV = async () => {
+        try {
+            let freshGuests = await guestApi.getByEvent(event.id);
+            if (!freshGuests || freshGuests.length === 0) {
+                freshGuests = getGuestFeed(event);
+            }
+            const data = freshGuests.map(g => ({
+                'Name': g.name,
+                'Email': g.email,
+                'Phone': g.phone,
+                'RSVP': g.rsvp,
+                'Dietary': g.dietary,
+                'Addons': Array.isArray(g.addons) ? g.addons.join(", ") : g.addons,
+                'Created At': g.createdAt ? new Date(g.createdAt).toLocaleString() : 'N/A'
+            }));
+            exportToCSV(data, `${event.clientName}_Guests.csv`);
+        } catch (err) {
+            console.error(err);
+            // Fallback gracefully on API catch
+            const freshGuests = getGuestFeed(event);
+            const data = freshGuests.map(g => ({
+                'Name': g.name,
+                'Email': g.email,
+                'Phone': g.phone,
+                'RSVP': g.rsvp,
+                'Dietary': g.dietary,
+                'Addons': Array.isArray(g.addons) ? g.addons.join(", ") : g.addons,
+                'Created At': g.createdAt ? new Date(g.createdAt).toLocaleString() : 'N/A'
+            }));
+            exportToCSV(data, `${event.clientName}_Guests.csv`);
+        }
+    };
+
+    const handleExportPDF = async () => {
+        try {
+            let freshGuests = await guestApi.getByEvent(event.id);
+            if (!freshGuests || freshGuests.length === 0) {
+                freshGuests = getGuestFeed(event);
+            }
+            const columns = ['Name', 'Email', 'Phone', 'RSVP', 'Dietary'];
+            const rows = freshGuests.map(g => [
+                g.name,
+                g.email,
+                g.phone,
+                g.rsvp,
+                g.dietary
+            ]);
+            exportToPDF(columns, rows, `${event.clientName} - Guest Manifest`, `${event.clientName.replace(/\s+/g, '_')}_Manifest.pdf`);
+        } catch (err) {
+            console.error(err);
+            // Fallback gracefully on API catch
+            const freshGuests = getGuestFeed(event);
+            const columns = ['Name', 'Email', 'Phone', 'RSVP', 'Dietary'];
+            const rows = freshGuests.map(g => [
+                g.name,
+                g.email,
+                g.phone,
+                g.rsvp,
+                g.dietary
+            ]);
+            exportToPDF(columns, rows, `${event.clientName} - Guest Manifest`, `${event.clientName.replace(/\s+/g, '_')}_Manifest.pdf`);
+        }
+    };
+    const handleExportInvoice = () => {
+        try {
+            const d = getPaymentData(event);
+            const columns = ['Description', 'Amount', 'Due Date', 'Paid Date', 'Status'];
+            const rows = d.schedule.map(p => [
+                p.description,
+                `$${p.amount.toLocaleString()}`,
+                p.dueDate,
+                p.paidDate,
+                p.status
+            ]);
+            exportToPDF(columns, rows, `${event.clientName} - Invoice`, `${event.clientName.replace(/\s+/g, '_')}_Invoice.pdf`);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const tabProps = { 
+        event: liveEvent, 
+        handleEmailBlast, 
+        handleExportReport,
+        handleExportCSV,
+        handleExportPDF,
+        handleExportInvoice,
+        // Pass down lifted state and handlers
+        globalInventory, setGlobalInventory,
+        globalUnits, setGlobalUnits,
+        handleInventoryUsageChange,
+        globalGuests, setGlobalGuests,
+        fnbBreakdown, setFnbBreakdown,
+        lastUpdate, handleDietaryChange
+    };
 
     const renderTab = () => {
         switch (activeTab) {
@@ -1421,40 +1619,7 @@ const EventDetail = () => {
         }
     };
 
-    const handleExportCSV = async () => {
-        try {
-            const freshGuests = await guestApi.getByEvent(event.id);
-            const data = freshGuests.map(g => ({
-                'Name': g.name,
-                'Email': g.email,
-                'Phone': g.phone,
-                'RSVP': g.rsvp,
-                'Dietary': g.dietary,
-                'Addons': Array.isArray(g.addons) ? g.addons.join(", ") : g.addons,
-                'Created At': new Date(g.createdAt).toLocaleString()
-            }));
-            exportToCSV(data, `${event.clientName}_Guests.csv`);
-        } catch (err) {
-            console.error(err);
-        }
-    };
 
-    const handleExportPDF = async () => {
-        try {
-            const freshGuests = await guestApi.getByEvent(event.id);
-            const columns = ['Name', 'Email', 'Phone', 'RSVP', 'Dietary'];
-            const rows = freshGuests.map(g => [
-                g.name,
-                g.email,
-                g.phone,
-                g.rsvp,
-                g.dietary
-            ]);
-            exportToPDF(columns, rows, `${event.clientName} - Guest Manifest`, `${event.clientName.replace(/\s+/g, '_')}_Manifest.pdf`);
-        } catch (err) {
-            console.error(err);
-        }
-    };
 
     return (
         <div ref={containerRef} className="min-h-screen flex bg-[#F8F9FB] font-sans">
@@ -1475,17 +1640,17 @@ const EventDetail = () => {
                             <span className="text-gray-200">|</span>
                             <div>
                                 <div className="flex items-center gap-3">
-                                    <h1 className="font-bold text-lg text-gray-900">{event.clientName}</h1>
+                                    <h1 className="font-bold text-lg text-gray-900">{liveEvent.clientName}</h1>
                                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${cs.bg} ${cs.text} ${cs.border}`}>
-                                        <span className={`w-1.5 h-1.5 rounded-full ${cs.dot}`} /> {event.contractStatus}
+                                        <span className={`w-1.5 h-1.5 rounded-full ${cs.dot}`} /> {liveEvent.contractStatus}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
-                                    <span className="flex items-center gap-1"><MapPin size={11} /> {event.destination}</span>
+                                    <span className="flex items-center gap-1"><MapPin size={11} /> {liveEvent.destination}</span>
                                     <span>·</span>
-                                    <span>{event.dates}</span>
+                                    <span>{liveEvent.dates}</span>
                                     <span>·</span>
-                                    <span>Cutoff: {event.cutoffDate}</span>
+                                    <span>Cutoff: {liveEvent.cutoffDate}</span>
                                 </div>
                             </div>
                         </div>

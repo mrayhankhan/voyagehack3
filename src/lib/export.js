@@ -1,5 +1,5 @@
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import Papa from 'papaparse';
 
 /**
@@ -48,7 +48,7 @@ export const exportToPDF = (columns, rows, title = 'Event Report', filename = 'r
   doc.setTextColor(150);
   doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
 
-  doc.autoTable({
+  autoTable(doc, {
     head: [columns],
     body: rows,
     startY: 35,

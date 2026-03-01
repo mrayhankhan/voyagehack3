@@ -106,20 +106,67 @@ export const getAllocationData = () => ({
 });
 
 // ── 6. TRANSPORT ────────────────────────────────────────────────────────────────
-export const getTransportData = (event) => ({
-    flights: [
-        { flightNo: 'AI 443', route: 'BOM → UDR', datetime: 'Nov 15 · 08:15', seats: 45, confirmed: 40, status: 'CONFIRMED' },
-        { flightNo: '6E 892', route: 'DEL → UDR', datetime: 'Nov 15 · 11:30', seats: 60, confirmed: 55, status: 'CONFIRMED' },
-        { flightNo: 'AI 448', route: 'UDR → BOM', datetime: 'Nov 18 · 16:40', seats: 45, confirmed: 38, status: 'CONFIRMED' },
-        { flightNo: '6E 897', route: 'UDR → DEL', datetime: 'Nov 18 · 19:00', seats: 60, confirmed: 48, status: 'PENDING' },
-    ],
-    groundTransport: [
-        { vehicle: 'Luxury Coach (52-seater)', qty: 3, route: 'Airport → Leela Palace', datetime: 'Nov 15 · Arrival rolling', status: 'ARRANGED' },
-        { vehicle: 'VIP Sedan', qty: 8, route: 'Hotel → Ceremony Venue', datetime: 'Nov 16 · 08:00', status: 'ARRANGED' },
-        { vehicle: 'Baraat Elephant + Horses', qty: 2, route: 'Ghat Entry Procession', datetime: 'Nov 16 · 09:00', status: 'CONFIRMED' },
-        { vehicle: 'Luxury Coach (52-seater)', qty: 3, route: 'Hotel → Airport', datetime: 'Nov 18 · Departure rolling', status: 'PENDING' },
-    ],
-});
+export const getTransportData = (initialInventory) => {
+    const transportCat = initialInventory?.find(c => c.key === 'transport');
+    const items = transportCat ? transportCat.items : [];
+
+    const flights = [];
+    const groundTransport = [];
+
+    // Static schedules to merge with dynamic inventory quantities
+    const flightSchedules = {
+        'AI 443 — BOM→UDR': { datetime: 'Nov 15 · 08:15' },
+        '6E 892 — DEL→UDR': { datetime: 'Nov 15 · 11:30' },
+        'AI 448 — UDR→BOM': { datetime: 'Nov 18 · 16:40' },
+        '6E 897 — UDR→DEL': { datetime: 'Nov 18 · 19:00' },
+    };
+
+    items.forEach(item => {
+        if (item.name.includes('AI') || item.name.includes('6E')) {
+            const parts = item.name.split(' — ');
+            flights.push({
+                flightNo: parts[0] || item.name,
+                route: parts[1] || 'TBD',
+                datetime: flightSchedules[item.name]?.datetime || 'TBD',
+                seats: item.total,
+                confirmed: item.used,
+                status: item.locked ? 'CONFIRMED' : 'PENDING'
+            });
+        } else {
+            // Treat as Ground Transport
+            groundTransport.push({
+                vehicle: item.name,
+                qty: item.total,
+                route: item.name.includes('Coach') ? 'Airport ↔ Hotel' : 'Hotel ↔ Venues',
+                datetime: 'Rolling Schedule',
+                status: item.locked ? 'CONFIRMED' : 'ARRANGED'
+            });
+        }
+    });
+
+    // Fallback if inventory is somehow missing
+    if (flights.length === 0 && groundTransport.length === 0) {
+        return {
+            flights: [
+                { flightNo: 'AI 443', route: 'BOM → UDR', datetime: 'Nov 15 · 08:15', seats: 45, confirmed: 40, status: 'CONFIRMED' },
+                { flightNo: '6E 892', route: 'DEL → UDR', datetime: 'Nov 15 · 11:30', seats: 60, confirmed: 55, status: 'CONFIRMED' },
+            ],
+            groundTransport: [
+                { vehicle: 'Luxury Coach (52-seater)', qty: 3, route: 'Airport → Leela Palace', datetime: 'Nov 15 · Arrival rolling', status: 'ARRANGED' }
+            ]
+        };
+    }
+
+    // Add Baraat and Sedan mock defaults that don't scale by headcount to fill out the UI natively
+    if(!groundTransport.find(g => g.vehicle.includes('Sedan'))) {
+        groundTransport.push(
+            { vehicle: 'VIP Sedan', qty: 8, route: 'Hotel → Ceremony Venue', datetime: 'Nov 16 · 08:00', status: 'ARRANGED' },
+            { vehicle: 'Baraat Elephant + Horses', qty: 2, route: 'Ghat Entry Procession', datetime: 'Nov 16 · 09:00', status: 'CONFIRMED' }
+        );
+    }
+
+    return { flights, groundTransport };
+};
 
 // ── 7. VENDORS ──────────────────────────────────────────────────────────────────
 export const getVendorData = () => ({

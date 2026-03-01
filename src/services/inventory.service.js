@@ -256,39 +256,82 @@ const ROOM_TYPES = [
 ];
 
 /**
- * Generates the full room unit grid for an event.
- * Returns an array of unit objects with occupancy state.
+ * Generates the full room unit grid directly from the initial Inventory.
+ * Ensures that the number of rooms exactly aligns with the allocated Accommodation block.
  * @param {object} event
+ * @param {InventoryCategory[]} initialInventory
  * @returns {RoomUnit[]}
  */
-export const getRoomUnitGrid = (event) => {
+export const getRoomUnitGrid = (event, initialInventory) => {
     const seed = event.id.split('').reduce((a, c) => a + c.charCodeAt(0), 42);
     let s = seed;
     const rnd = () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0x100000000; };
 
+    const accommodationCat = initialInventory?.find(c => c.key === 'accommodation');
+    if (!accommodationCat) return [];
+
     const units = [];
-    ROOM_TYPES.forEach((rt) => {
-        rt.floors.forEach((floor) => {
-            for (let n = 1; n <= rt.perFloor; n++) {
-                const roomNo = floor === 0
-                    ? `${rt.prefix}-${String(n).padStart(2, '0')}`
-                    : `${rt.prefix}-${floor}${String(n).padStart(2, '0')}`;
-                const r = rnd();
-                const status = r < 0.72 ? 'OCCUPIED' : r < 0.82 ? 'BLOCKED' : 'FREE';
-                units.push({
-                    id: roomNo,
-                    roomNo,
-                    type: rt.type,
-                    prefix: rt.prefix,
-                    floor: floor || 'G',
-                    ratePerNight: rt.ratePerNight,
-                    value: rt.ratePerNight * rt.nights,
-                    status,
-                    assignedTo: status === 'OCCUPIED' ? `Guest-${Math.floor(rnd() * 200)}` : null,
-                });
+    
+    // Map Inventory Item Names back to Room Types and Floor configs
+    const invMap = {
+        'Deluxe Rooms': { type: 'Deluxe Room', prefix: 'DLX', floors: [1, 2, 3], ratePerNight: 280, nights: 3 },
+        'Superior Suites': { type: 'Superior Suite', prefix: 'SUI', floors: [4, 5], ratePerNight: 520, nights: 3 },
+        'Presidential Suite': { type: 'Presidential Suite', prefix: 'PRS', floors: [6], ratePerNight: 1200, nights: 3 },
+        'Garden Cottages': { type: 'Garden Cottage', prefix: 'GDN', floors: [0], ratePerNight: 380, nights: 3 }
+    };
+
+    accommodationCat.items.forEach(item => {
+        const config = invMap[item.name];
+        if (!config) return;
+        
+        const totalToGenerate = item.total;
+        let numOccupied = item.used;
+        
+        let roomsCreated = 0;
+        let currentFloorIndex = 0;
+        let floorCount = 1;
+
+        while (roomsCreated < totalToGenerate) {
+            const floorNum = config.floors[currentFloorIndex];
+            const roomNo = floorNum === 0 
+                ? `${config.prefix}-${String(floorCount).padStart(2, '0')}`
+                : `${config.prefix}-${floorNum}${String(floorCount).padStart(2, '0')}`;
+                
+            // Determine status: decrement numOccupied until 0 for OCCUPIED. Then others are FREE. 
+            // We use item.locked to determine if 'FREE' might instead be 'BLOCKED' via random chance if total cap isn't met.
+            let status = 'FREE';
+            
+            if (numOccupied > 0) {
+                status = 'OCCUPIED';
+                numOccupied--;
+            } else if (!item.locked) {
+                // If the inventory item block isn't fully locked contractually, represent some holdbacks
+                status = rnd() < 0.2 ? 'BLOCKED' : 'FREE';
             }
-        });
+            
+            units.push({
+                id: roomNo,
+                roomNo,
+                type: config.type,
+                prefix: config.prefix,
+                floor: floorNum || 'G',
+                ratePerNight: config.ratePerNight,
+                value: config.ratePerNight * config.nights,
+                status,
+                assignedTo: status === 'OCCUPIED' ? `Guest-${Math.floor(rnd() * 300)}` : null
+            });
+            
+            roomsCreated++;
+            floorCount++;
+            
+            // Distribute across floors evenly
+            if (floorCount > 12) {
+                floorCount = 1;
+                currentFloorIndex = (currentFloorIndex + 1) % config.floors.length;
+            }
+        }
     });
+
     return units;
 };
 
