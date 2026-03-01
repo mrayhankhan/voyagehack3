@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // hashed
+  name      String
+  role      String   // "agent", "planner", "supplier"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Event {
+  id        String   @id @default(uuid())
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  location  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  inventory InventoryBlock[]
+  bookings  Booking[]
+  guests    Guest[]
+}
+
+model InventoryBlock {
+  id             String    @id @default(uuid())
+  eventId        String
+  event          Event     @relation(fields: [eventId], references: [id])
+  type           String    // "hotel" | "flight"
+  provider        String    // "amadeus"
+  supplier        String?
+  providerRefId   String?
+  providerOfferId String?   // provider's offer id
+  providerData    String?   // JSON stringified
+  lockedUnits     Int
+  allocatedUnits  Int       @default(0)
+  availableUnits  Int
+  costPerUnit    Float
+  sellPerUnit    Float
+  releaseDate    DateTime?
+  holdExpiresAt  DateTime? // if provider hold
+  status         String    // "ACTIVE" | "EXPIRED" | "TRANSFERRED"
+  metadata       String?   // serialized JSON string (SQLite doesn't support JSON type natively in all edge cases via Prisma without specific config, but String works)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  version        Int       @default(1) // optimistic locking
+
+  bookings       Booking[]
+
+  @@index([eventId])
+}
+
+model Booking {
+  id                 String          @id @default(uuid())
+  eventId            String
+  event              Event           @relation(fields: [eventId], references: [id])
+  guestId            String?
+  type               String          // "hotel" | "flight"
+  inventoryBlockId   String?
+  inventoryBlock     InventoryBlock? @relation(fields: [inventoryBlockId], references: [id])
+  providerBookingId  String?
+  affiliateReference String?
+  status             String          // "PENDING_PROVIDER" | "CONFIRMED" | "FAILED" | "CANCELLED" | "PENDING_MANUAL_CONFIRM"
+  cost               Float
+  sellPrice          Float
+  margin             Float
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  idempotencyKey     String?         @unique
+
+  @@index([eventId])
+  @@index([inventoryBlockId])
+}
+
+model Guest {
+  id        String   @id @default(uuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  name      String
+  email     String   @unique
+  phone     String?
+  rsvp      String   // "YES" | "NO" | "PENDING"
+  pax       Int      @default(1)
+  dietary   String?
+  addons    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventId])
+}

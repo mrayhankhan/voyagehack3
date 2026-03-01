@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { useNavigate } from 'react-router-dom';
-import { useStore } from '../store';
+import { useAuth } from '../hooks/useAuth';
+import { Shield, Users, Building2 } from 'lucide-react';
 
 const Login = () => {
   const container = useRef(null);
   const navigate = useNavigate();
-  const login = useStore(state => state.login);
-  const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
+  const [loadingRole, setLoadingRole] = useState(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -18,47 +18,100 @@ const Login = () => {
         duration: 0.8,
         ease: 'power2.out'
       });
+      gsap.from('.role-btn', {
+        opacity: 0,
+        y: 10,
+        duration: 0.4,
+        stagger: 0.1,
+        ease: 'power2.out',
+        delay: 0.2
+      });
     }, container);
     return () => ctx.revert();
   }, []);
 
-  const handleAuth = (e) => {
-    e.preventDefault();
-    setIsLoading(true);
+  const handleAuth = (roleConfig) => {
+    setLoadingRole(roleConfig.id);
     setTimeout(() => {
-      login({ name: 'Demo Agent', email: email || 'agent@tbo.com' });
+      login({ name: roleConfig.name, email: roleConfig.email, role: roleConfig.role });
       navigate('/agent/dashboard');
     }, 600);
   };
 
+  const roles = [
+    {
+      id: 'agent',
+      role: 'AGENT',
+      name: 'Sarah (Agent)',
+      email: 'agent@tbo.com',
+      icon: Shield,
+      title: 'Agent',
+      desc: 'Full access to financials, margins, and contracts.',
+      iconColor: 'text-gray-400'
+    },
+    {
+      id: 'planner',
+      role: 'PLANNER',
+      name: 'James (Planner)',
+      email: 'planner@tbo.com',
+      icon: Users,
+      title: 'Planner',
+      desc: 'Manages guests, RSVPs, and room allocations. No financials.',
+      iconColor: 'text-gray-500'
+    },
+    {
+      id: 'supplier',
+      role: 'SUPPLIER',
+      name: 'Taj Hotels (Supplier)',
+      email: 'supplier@taj.com',
+      icon: Building2,
+      title: 'Supplier',
+      desc: 'Manages inventory and fulfillment. No margins or contract edits.',
+      iconColor: 'text-gray-600'
+    }
+  ];
+
   return (
-    <div ref={container} className="min-h-screen bg-tbo-indigo flex flex-col items-center justify-center p-6 relative font-sans">
-      <div className="login-card bg-white p-10 md:p-12 rounded-[2.5rem] shadow-xl w-full max-w-md text-center">
-        
-        <div className="font-bold text-4xl text-tbo-indigo mb-8 tracking-tight">tbo</div>
+    <div ref={container} className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 relative font-sans">
 
-        <form onSubmit={handleAuth} className="space-y-5 text-left mb-8">
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">Email</label>
-            <input 
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="agent@tbo.com"
-              className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-3 text-tbo-indigo outline-none focus:border-tbo-saffron transition-colors"
-            />
-          </div>
+      {/* Background decoration */}
+      <div className="absolute top-0 left-0 w-full h-1/2 bg-black rounded-b-[4rem] shadow-xl z-0" />
 
-          <button 
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-tbo-indigo text-white py-4 rounded-full font-bold text-lg mt-4 shadow-lg hover:bg-[#2A1B4E] transition-colors disabled:opacity-70"
-          >
-            {isLoading ? 'Authenticating...' : 'Sign In to Dashboard'}
-          </button>
-        </form>
+      <div className="login-card bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl w-full max-w-lg text-center z-10">
 
-        <p className="text-xs text-gray-400 font-mono tracking-widest uppercase">Agent access only</p>
+        <div className="font-bold text-5xl text-black mb-2 tracking-tight">tbo</div>
+        <div className="text-sm font-semibold text-gray-400 tracking-widest uppercase mb-8">Role Simulation</div>
+
+        <div className="space-y-4 text-left">
+          {roles.map((r) => {
+            const Icon = r.icon;
+            const isLoading = loadingRole === r.id;
+            return (
+              <button
+                key={r.id}
+                onClick={() => handleAuth(r)}
+                disabled={loadingRole !== null}
+                className={`role-btn w-full p-5 rounded-2xl flex items-start gap-4 transition-all duration-200 border-2 disabled:opacity-50 disabled:cursor-not-allowed 
+                  ${r.id === 'agent' ? 'bg-black border-black text-white hover:bg-gray-900 hover:border-gray-900' : ''}
+                  ${r.id === 'planner' ? 'bg-white border-gray-200 text-black hover:bg-gray-50 hover:border-gray-400' : ''}
+                  ${r.id === 'supplier' ? 'bg-white border-gray-200 text-black hover:bg-gray-50 hover:border-gray-400' : ''}
+                  ${loadingRole === r.id ? 'scale-95' : 'hover:scale-[1.02]'}
+                `}
+              >
+                <div className={`mt-1 p-2 rounded-xl bg-gray-100 ${r.iconColor}`}>
+                  {isLoading ? <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon size={20} />}
+                </div>
+                <div className="flex-1">
+                  <div className={`font-bold text-lg ${r.id !== 'agent' ? 'text-black' : ''}`}>{r.title}</div>
+                  <div className={`text-xs mt-1 leading-relaxed ${r.id === 'agent' ? 'text-gray-300' : 'text-gray-500'}`}>
+                    {r.desc}
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
       </div>
     </div>
   );

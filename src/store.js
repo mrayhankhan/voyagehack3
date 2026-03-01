@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 export const useStore = create((set) => ({
-  user: null, // null | { name: 'Agent', email: 'agent@tbo.com' }
+  user: null, // null | { name: 'Agent', email: '...', role: 'AGENT' | 'PLANNER' | 'SUPPLIER' }
   events: [], // Array of created events
   login: (userData) => set({ user: userData }),
   logout: () => set({ user: null }),
