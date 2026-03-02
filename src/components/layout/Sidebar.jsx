@@ -11,7 +11,7 @@ const Sidebar = ({ onNavigate, onLogout }) => {
 
     return (
         <aside className="w-64 bg-tbo-indigo text-white flex flex-col p-8 fixed h-full z-20">
-            <div className="font-bold text-4xl tracking-tight mb-16">tbo</div>
+            <div className="font-bold text-4xl tracking-tight mb-16">saathi</div>
 
             <nav className="flex-1 space-y-1 mt-6">
                 <button

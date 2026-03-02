@@ -79,7 +79,7 @@ const Login = () => {
 
       <div className="login-card bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl w-full max-w-lg text-center z-10">
 
-        <div className="font-bold text-5xl text-[#1A0F2E] mb-2 tracking-tight">tbo</div>
+        <div className="font-bold text-5xl text-[#1A0F2E] mb-2 tracking-tight">saathi</div>
         <div className="text-sm font-semibold text-gray-400 tracking-widest uppercase mb-8">Role Simulation</div>
 
         <div className="space-y-4 text-left">

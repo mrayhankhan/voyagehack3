@@ -102,7 +102,7 @@ const Landing = () => {
 
       {/* Minimal Footer */}
       <footer className="relative z-10 w-full text-center py-12 border-t border-white/10 mt-auto">
-        <div className="font-sans font-bold text-2xl mb-2 text-white">tbo</div>
+        <div className="font-sans font-bold text-2xl mb-2 text-white">saathi</div>
         <p className="font-serif italic text-gray-400">Destination Weddings meet Celebration.</p>
       </footer>
     </div>

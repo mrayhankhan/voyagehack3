@@ -542,7 +542,7 @@ const Microsite = () => {
         {/* Footer */}
         <footer className="py-24 text-center border-t border-amber-500/10">
           <div className="font-royal text-amber-500/40 text-[10px] tracking-[0.5em] uppercase mb-6">Designed for Excellence</div>
-          <div className="font-royal text-2xl text-amber-400 tracking-tighter mb-2">TBO EVENT OS</div>
+          <div className="font-royal text-2xl text-amber-400 tracking-tighter mb-2">Saathi EVENT OS</div>
           <div className="font-sans text-[10px] text-amber-500/40 uppercase tracking-widest">© {new Date().getFullYear()} Imperial Edition</div>
         </footer>
 
