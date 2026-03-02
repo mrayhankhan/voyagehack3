@@ -7,7 +7,7 @@ import { useAuth } from '../../hooks/useAuth';
  * Sidebar — agent dashboard left nav, extracted from Dashboard.jsx
  */
 const Sidebar = ({ onNavigate, onLogout }) => {
-    const { user, canSeeMargin } = useAuth();
+    const { canSeeMargin } = useAuth();
 
     return (
         <aside className="w-64 bg-tbo-indigo text-white flex flex-col p-8 fixed h-full z-20">

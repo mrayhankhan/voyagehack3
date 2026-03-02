@@ -33,6 +33,25 @@ const OVERVIEW_TILES = [
   { icon: <Star size={28} />, label: 'Vibe' },
 ];
 
+// Helper functions for random particles (defined outside to avoid impure render errors)
+const generateEnvelopeParticles = () => [...Array(20)].map(() => ({
+  left: `${Math.random() * 100}%`,
+  bottom: `${Math.random() * 30}%`,
+  delay: `${Math.random() * 4}s`,
+  duration: `${3 + Math.random() * 3}s`,
+  width: `${2 + Math.random() * 4}px`,
+  height: `${2 + Math.random() * 4}px`,
+}));
+
+const generateHeroParticles = () => [...Array(12)].map(() => ({
+  left: `${10 + Math.random() * 80}%`,
+  bottom: `${Math.random() * 40}%`,
+  delay: `${Math.random() * 5}s`,
+  duration: `${4 + Math.random() * 4}s`,
+  width: `${2 + Math.random() * 3}px`,
+  height: `${2 + Math.random() * 3}px`,
+}));
+
 const Microsite = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -46,12 +65,16 @@ const Microsite = () => {
   const event = MOCK_EVENTS.find(e => e.id === id) || MOCK_EVENTS[0];
   const itineraryRef = useRef(null);
 
-  const days = [...new Set(ITINERARY.map(i => i.day))];
+  // Remove unused days variable
 
   useEffect(() => {
     if (id) joinEventRoom(id);
     window.scrollTo(0, 0);
   }, [id, isOpen]);
+
+  // Memoize random particles to avoid impure function calls during render
+  const envelopeParticles = React.useMemo(() => generateEnvelopeParticles(), []);
+  const heroParticles = React.useMemo(() => generateHeroParticles(), []);
 
   const handleOpen = () => {
     const tl = gsap.timeline();
@@ -201,14 +224,14 @@ const Microsite = () => {
         <div className="envelope-wrapper fixed inset-0 z-[100] bg-[#290916] flex items-center justify-center p-6 text-center">
           {/* Floating Gold Particles Background */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {[...Array(20)].map((_, i) => (
+            {envelopeParticles.map((p, i) => (
               <div key={i} className="gold-particle" style={{
-                left: `${Math.random() * 100}%`,
-                bottom: `${Math.random() * 30}%`,
-                animationDelay: `${Math.random() * 4}s`,
-                animationDuration: `${3 + Math.random() * 3}s`,
-                width: `${2 + Math.random() * 4}px`,
-                height: `${2 + Math.random() * 4}px`,
+                left: p.left,
+                bottom: p.bottom,
+                animationDelay: p.delay,
+                animationDuration: p.duration,
+                width: p.width,
+                height: p.height,
               }} />
             ))}
           </div>
@@ -265,14 +288,14 @@ const Microsite = () => {
           <div className="absolute top-0 inset-x-0 h-64 bg-gradient-to-b from-[#451125] to-transparent pointer-events-none" />
           {/* Ambient floating particles */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {[...Array(12)].map((_, i) => (
+            {heroParticles.map((p, i) => (
               <div key={i} className="gold-particle" style={{
-                left: `${10 + Math.random() * 80}%`,
-                bottom: `${Math.random() * 40}%`,
-                animationDelay: `${Math.random() * 5}s`,
-                animationDuration: `${4 + Math.random() * 4}s`,
-                width: `${2 + Math.random() * 3}px`,
-                height: `${2 + Math.random() * 3}px`,
+                left: p.left,
+                bottom: p.bottom,
+                animationDelay: p.delay,
+                animationDuration: p.duration,
+                width: p.width,
+                height: p.height,
               }} />
             ))}
           </div>
