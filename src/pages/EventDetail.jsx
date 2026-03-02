@@ -187,7 +187,12 @@ const OverviewTab = ({ event, handleEmailBlast, handleExportReport, globalInvent
     );
 };
 
-const ContractTab = ({ event }) => {
+const ContractTab = ({ 
+    event, 
+    handleRequestAmendment, 
+    handleDownloadSignedContract, 
+    handleSimulateRuleTrigger 
+}) => {
     const pdc = useMemo(() => getDigitalContractData(event), [event]);
     const [health, setHealth] = useState(computeContractHealth(event, pdc));
     const { commercialTerms: ct, inclusions, automationRules } = pdc;
@@ -438,9 +443,9 @@ const ContractTab = ({ event }) => {
                     {/* Quick actions */}
                     {canEditContract && (
                         <div className="flex flex-col gap-2">
-                            <Btn icon={FileText} label="Request Amendment" variant="outline" />
-                            <Btn icon={Download} label="Download Signed Copy" variant="outline" />
-                            <Btn icon={Zap} label="Simulate Rule Trigger" variant="outline" />
+                            <Btn icon={FileText} label="Request Amendment" variant="outline" onClick={handleRequestAmendment} />
+                            <Btn icon={Download} label="Download Signed Copy" variant="outline" onClick={handleDownloadSignedContract} />
+                            <Btn icon={Zap} label="Simulate Rule Trigger" variant="outline" onClick={handleSimulateRuleTrigger} />
                         </div>
                     )}
                 </div>
@@ -1430,11 +1435,35 @@ const EventDetail = () => {
         });
     };
 
-    // Derived live event state for sync consistent UI
     const liveEvent = useMemo(() => ({
         ...event,
         confirmedGuests: globalGuests.filter(g => g.rsvp === 'CONFIRMED').length
     }), [event, globalGuests]);
+
+    const handleRequestAmendment = () => {
+        alert("Contract Amendment request has been sent to the hotel partner.");
+    };
+
+    const handleDownloadSignedContract = () => {
+        const pdc = getDigitalContractData(liveEvent);
+        const columns = ["Parameter", "Value"];
+        const rows = [
+            ["Contract ID", pdc.meta.contractId],
+            ["Client Name", liveEvent.clientName],
+            ["Destination", liveEvent.destination],
+            ["Headcount", liveEvent.headcount],
+            ["Min Units", pdc.commercialTerms.minUnits],
+            ["Max Units", pdc.commercialTerms.maxUnits],
+            ["Effective Date", pdc.meta.effectiveDate],
+            ["Signed Date", pdc.meta.signedDate],
+            ["Jurisdiction", pdc.meta.jurisdiction]
+        ];
+        exportToPDF(columns, rows, `Digital Contract - ${liveEvent.clientName}`, `${liveEvent.clientName.replace(/\s+/g, '_')}_Contract.pdf`);
+    };
+
+    const handleSimulateRuleTrigger = () => {
+        alert("Simulating PDC Automation Rule Trigger: Rule PDC-RULE-001 (Minimum Pax Alert) has been activated.");
+    };
 
     // Sync handler: when an allocation changes, update the inventory used count
     const handleInventoryUsageChange = (roomType, delta) => {
@@ -1593,6 +1622,9 @@ const EventDetail = () => {
         handleExportCSV,
         handleExportPDF,
         handleExportInvoice,
+        handleRequestAmendment,
+        handleDownloadSignedContract,
+        handleSimulateRuleTrigger,
         // Pass down lifted state and handlers
         globalInventory, setGlobalInventory,
         globalUnits, setGlobalUnits,
