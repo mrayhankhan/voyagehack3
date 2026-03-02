@@ -58,16 +58,6 @@ const Login = () => {
       title: 'Planner',
       desc: 'Manages guests, RSVPs, and room allocations. No financials.',
       iconColor: 'text-gray-500'
-    },
-    {
-      id: 'supplier',
-      role: 'SUPPLIER',
-      name: 'Taj Hotels (Supplier)',
-      email: 'supplier@taj.com',
-      icon: Building2,
-      title: 'Supplier',
-      desc: 'Manages inventory and fulfillment. No margins or contract edits.',
-      iconColor: 'text-gray-600'
     }
   ];
 
