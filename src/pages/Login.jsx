@@ -18,8 +18,8 @@ const Login = () => {
         duration: 0.8,
         ease: 'power2.out'
       });
+      // Removed opacity from role-btn animation to prevent invisible buttons if GSAP fails
       gsap.from('.role-btn', {
-        opacity: 0,
         y: 10,
         duration: 0.4,
         stagger: 0.1,
@@ -79,31 +79,34 @@ const Login = () => {
 
       <div className="login-card bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl w-full max-w-lg text-center z-10">
 
-        <div className="font-bold text-5xl text-black mb-2 tracking-tight">tbo</div>
+        <div className="font-bold text-5xl text-[#1A0F2E] mb-2 tracking-tight">tbo</div>
         <div className="text-sm font-semibold text-gray-400 tracking-widest uppercase mb-8">Role Simulation</div>
 
         <div className="space-y-4 text-left">
           {roles.map((r) => {
             const Icon = r.icon;
             const isLoading = loadingRole === r.id;
+            const isAgent = r.id === 'agent';
+            
             return (
               <button
                 key={r.id}
                 onClick={() => handleAuth(r)}
                 disabled={loadingRole !== null}
-                className={`role-btn w-full p-5 rounded-2xl flex items-start gap-4 transition-all duration-200 border-2 disabled:opacity-50 disabled:cursor-not-allowed 
-                  ${r.id === 'agent' ? 'bg-black border-black text-white hover:bg-gray-900 hover:border-gray-900' : ''}
-                  ${r.id === 'planner' ? 'bg-white border-gray-200 text-black hover:bg-gray-50 hover:border-gray-400' : ''}
-                  ${r.id === 'supplier' ? 'bg-white border-gray-200 text-black hover:bg-gray-50 hover:border-gray-400' : ''}
-                  ${loadingRole === r.id ? 'scale-95' : 'hover:scale-[1.02]'}
+                style={{ opacity: 1, visibility: 'visible' }}
+                className={`role-btn w-full p-5 rounded-2xl flex items-start gap-4 transition-all duration-200 border-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm
+                  ${isAgent 
+                    ? 'bg-[#1A0F2E] border-[#1A0F2E] text-white hover:bg-[#110a1f] hover:shadow-lg' 
+                    : 'bg-white border-gray-200 text-[#1A0F2E] hover:bg-gray-50 hover:border-[#1A0F2E]/30 hover:shadow-md'}
+                  ${loadingRole === r.id ? 'scale-95' : 'hover:scale-[1.01]'}
                 `}
               >
-                <div className={`mt-1 p-2 rounded-xl bg-gray-100 ${r.iconColor}`}>
+                <div className={`mt-1 p-2 rounded-xl ${isAgent ? 'bg-white/10' : 'bg-gray-100'} ${r.iconColor}`}>
                   {isLoading ? <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon size={20} />}
                 </div>
-                <div className="flex-1">
-                  <div className={`font-bold text-lg ${r.id !== 'agent' ? 'text-black' : ''}`}>{r.title}</div>
-                  <div className={`text-xs mt-1 leading-relaxed ${r.id === 'agent' ? 'text-gray-300' : 'text-gray-500'}`}>
+                <div className="flex-1 text-left">
+                  <div className={`font-bold text-lg ${isAgent ? 'text-white' : 'text-gray-900'}`}>{r.title}</div>
+                  <div className={`text-xs mt-1 leading-relaxed ${isAgent ? 'text-gray-300' : 'text-gray-500'}`}>
                     {r.desc}
                   </div>
                 </div>
